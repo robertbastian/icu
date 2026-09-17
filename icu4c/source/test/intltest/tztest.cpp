@@ -2468,10 +2468,10 @@ void TimeZoneTest::TestGetRegion()
         {"EST5EDT",                         "001"},
         {"PST",                             "US"},  // Link America/Los_Angeles
         {"Europe/Helsinki",                 "FI"},
-        {"Europe/Mariehamn",                "AX"},  // Link Europe/Helsinki, but in zone.tab
+        {"Europe/Mariehamn",                "AX"},  // Link Europe/Helsinki, but its own CLDR zone
         {"Asia/Riyadh",                     "SA"},
         // tz file solar87 was removed from tzdata2013i
-        // {"Asia/Riyadh87",                   "001"}, // this should be "SA" actually, but not in zone.tab
+        // {"Asia/Riyadh87",                   "001"}, // this should be "SA" actually, but not in CLDR
         {"Atlantic/Jan_Mayen",              "SJ"},
         {"Pacific/Truk",                    "FM"},
         {"Etc/Unknown",                     nullptr},  // CLDR canonical, but not a sysmte zone ID
