@@ -254,10 +254,12 @@ endif
 ifneq ($(TZDATA),)
 
 TZCODE_DIR=$(top_builddir)/tools/tzcode
-ZONEINFO=$(TZCODE_DIR)/zoneinfo64.txt
+# The tzcode build unpacks the tarballs and writes everything it generates
+# into an "out" subdirectory.
+ZONEINFO=$(TZCODE_DIR)/out/zoneinfo64.txt
 
 # Override the normal genrb for zoneinfo to always pull from
-# icu/source/tools/tzcode/zoneinfo64.txt
+# icu/source/tools/tzcode/out/zoneinfo64.txt
 $(BUILDDIR)/zoneinfo64.res: $(ZONEINFO) $(TOOLBINDIR)/genrb$(TOOLEXEEXT) | $(BUILDDIR)/cnvalias.icu
 	@echo Note: $(MISCSRCDIR)/zoneinfo.txt is IGNORED because $(TZDATA) is present.
 	$(INVOKE) $(TOOLBINDIR)/genrb $(GENRBOPTS) -q -i $(BUILDDIR) -d $(BUILDDIR) $(ZONEINFO)

@@ -268,6 +268,10 @@ icu4c/source/tools/makeconv/makeconv
 icu4c/source/tools/makeconv/makeconv.[0-9]
 icu4c/source/tools/pkgdata/pkgdata
 icu4c/source/tools/pkgdata/pkgdata.[0-9]
+# The tzdata/tzcode tarballs a maintainer drops here, and everything the
+# tzcode build unpacks and generates from them (removed by "make clean").
+icu4c/source/tools/tzcode/*.tar.gz
+icu4c/source/tools/tzcode/out/
 icu4c/source/uconfig.h.prepend
 icu4j/eclipse
 tools/multi/proj/icu4cscan/cooked

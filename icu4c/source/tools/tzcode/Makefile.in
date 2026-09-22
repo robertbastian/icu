@@ -18,41 +18,54 @@ ifeq ($(TZCODE),)
 TZCODE = $(firstword $(wildcard ./tzcode*.tar.gz) $(wildcard $(srcdir)/tzcode*.tar.gz))
 endif
 
+# Everything that is unpacked from the tzdata/tzcode tarballs, and everything
+# that the tz tools generate, goes into this directory, so that the source
+# directory only ever contains checked-in files. "make clean" just removes it.
+#
+# zic and tz2icu read and write several files by fixed name in the current
+# directory, so they are run with OUTDIR as their working directory; the paths
+# handed to (or compiled into) them are therefore absolute.
+OUTDIR = out
+OUTDIR_ABS := $(abspath $(OUTDIR))
+
 # Zone/region mapping and metazone standard/DST offsets, generated into the ICU
 # source tree by the CLDR-to-ICU conversion tool (see tools/cldr/cldr-to-icu/).
 # This data is only used here, when generating zoneinfo64.txt; it is not part of
 # ICU's runtime data.
-ZONE_REGIONS = $(top_srcdir)/data/tzdata/zoneRegions.txt
-METAZONE_OFFSETS = $(top_srcdir)/data/tzdata/metazoneOffsets.txt
+ZONE_REGIONS := $(abspath $(top_srcdir)/data/tzdata/zoneRegions.txt)
+METAZONE_OFFSETS := $(abspath $(top_srcdir)/data/tzdata/metazoneOffsets.txt)
+
+# ICU-specific supplemental zones, compiled by zic alongside the tzdata.
+ICUZONES := $(abspath $(srcdir)/icuzones)
 
 
 PRIMARY_DATA = africa antarctica asia australasia europe northamerica southamerica
 SUPPLEMENTAL_DATA = etcetera factory backward
 TDATA =	$(PRIMARY_DATA) $(SUPPLEMENTAL_DATA)
+# The same files, as they are unpacked into the output directory.
+TDATA_FILES = $(TDATA:%=$(OUTDIR)/%)
+TDATA_MARKER = $(OUTDIR)/tdatamarker
 
+# Zone data compiled by zic, relative to OUTDIR.
 TZDIR=zoneinfo
 
 # https://man7.org/linux/man-pages/man2/symlink.2.html
 CFLAGS+=-D_POSIX_C_SOURCE=200112L
 CPPFLAGS+= -DTZDIR=\"$(TZDIR)\" 
 
-# more data
-XDATA=zone.tab leapseconds iso3166.tab
-ICUDATA=ZoneMetaData.java icu_zone.txt tz2icu zoneinfo64.txt zoneinfo.txt
-
-VANGUARD_DIR= ./vanguard
+VANGUARD_DIR= $(OUTDIR)/vanguard
 
 # For TZ DB/ICU comparison
-TZORIG=./tzorig
-TZORIG_TZDIR=./tzorig/tzdir
-TZORIG_ABS := $(shell pwd)/tzorig
-TZORIG_TZDIR_ABS := $(TZORIG_ABS)/tzdir
+TZORIG=$(OUTDIR)/tzorig
+TZORIG_TZDIR=$(TZORIG)/tzdir
+TZORIG_ABS := $(abspath $(TZORIG))
+TZORIG_TZDIR_ABS := $(abspath $(TZORIG_TZDIR))
 TZORIG_OPTS := CFLAGS="-D_POSIX_C_SOURCE $(TZORIG_EXTRA_CFLAGS)" TZDIR=$(TZORIG_TZDIR_ABS)
 
 
 ## Options for building zdumps
-ZDUMPOUT=$(shell pwd)/zdumpout
-ICUZDUMPOUT=$(shell pwd)/icuzdumpout
+ZDUMPOUT=$(OUTDIR_ABS)/zdumpout
+ICUZDUMPOUT=$(OUTDIR_ABS)/icuzdumpout
 
 ZDUMP_OPTS= -v -a -d $(ZDUMPOUT) -c 1902,2038 -i
 ICUZDUMP_OPTS= -a -d $(ICUZDUMPOUT)
@@ -89,12 +102,13 @@ $(TZCODE_TARGETS):
 	@echo ERROR "tzdata*.tar.gz" can\'t be found.
 	@false
 else
-tzorig:	$(TZCODE) $(TZDATA)
-	-$(RMV) ./tzorig/
-	mkdir $@
-	mkdir $(TZORIG_TZDIR)
-	gunzip -d < $(TZDATA) | ( cd $@ ; tar xf - )
-	gunzip -d < $(TZCODE) | ( cd $@ ; tar xf - )
+tzorig: $(TZORIG)
+
+$(TZORIG):	$(TZCODE) $(TZDATA)
+	-$(RMV) $(TZORIG)
+	mkdir -p $(TZORIG_TZDIR)
+	gunzip -d < $(TZDATA) | ( cd $(TZORIG) ; tar xf - )
+	gunzip -d < $(TZCODE) | ( cd $(TZORIG) ; tar xf - )
 	for tzfile in $(TDATA) ; do \
 		mv $(TZORIG)/$$tzfile $(TZORIG)/$$tzfile.bak && \
 		awk -v DATAFORM=rearguard -f $(TZORIG)/ziguard.awk $(TZORIG)/$$tzfile.bak > $(TZORIG)/$$tzfile; \
@@ -107,23 +121,23 @@ tzorig:	$(TZCODE) $(TZDATA)
 	sed -e '/if (line ~ \/^R SystemV \/) return/s/^/#/' $(TZORIG)/zishrink.awk.orig > $(TZORIG)/zishrink.awk
 #	-mv $(TZORIG)/Makefile $(TZORIG)/Makefile.orig
 #	sed -e "s/^BACKWARD=.*/BACKWARD= backward pacificnew/" $(TZORIG)/Makefile.orig > $(TZORIG)/Makefile
-	$(MAKE) -C $@ $(TZORIG_OPTS) tzdir.h zdump zones
+	$(MAKE) -C $(TZORIG) $(TZORIG_OPTS) tzdir.h zdump zones
 
-$(ZDUMPOUT): tzorig
+$(ZDUMPOUT): $(TZORIG)
 	( cd $(TZORIG) ; ./zdump$(EXEEXT) $(ZDUMP_OPTS) )
 	find $(ZDUMPOUT) -name '*--ICU' -exec sh -c 'mv "$${0}" $${0%--ICU}' {} \;
 
 dump-out: $(ZDUMPOUT) $(ICUZDUMPOUT)
 
 check-dump: dump-out
-	diff -r zdumpout icuzdumpout
+	diff -r $(ZDUMPOUT) $(ICUZDUMPOUT)
 
 endif
 endif
 
 $(ICUZDUMPOUT): $(ICUZDUMPEXEC)
 	-$(RMV) $(ICUZDUMPOUT)
-	-mkdir $(ICUZDUMPOUT)
+	-mkdir -p $(ICUZDUMPOUT)
 	$(INVOKE) $(ICUZDUMPEXEC) $(ICUZDUMP_OPTS)
 
 
@@ -132,7 +146,7 @@ $(ICUZDUMPOUT): $(ICUZDUMPEXEC)
 #
 
 
-$(ZICTARG):		$(OBJECTS) $(TDATA) $(srcdir)/tz2icu.h
+$(ZICTARG):		$(OBJECTS) $(TDATA_FILES) $(srcdir)/tz2icu.h
 		$(CC) $(CFLAGS) $(TZORIG_EXTRA_CFLAGS) $(LFLAGS) -I$(srcdir) $(OBJECTS) $(LDLIBS) -o $@
 
 $(TZ2ICUTARG):	$(srcdir)/tz2icu.cpp $(srcdir)/tz2icu.h $(ZONE_REGIONS) $(METAZONE_OFFSETS)
@@ -142,41 +156,33 @@ $(ICUZDUMPTARG):	$(srcdir)/icuzdump.cpp
 		$(LINK.cc)  -I$(srcdir) -I$(top_srcdir)/common -I$(top_srcdir)/i18n -I$(top_srcdir)/tools/toolutil -I$(top_srcdir)/io  -pedantic $(srcdir)/icuzdump.cpp $(LIBICUUC) $(LIBICUDT) $(LIBICUI18N) $(LIBICUIO) $(LIBICUTOOLUTIL) -o $@
 
 
-$(TDATA): tdatamarker
+$(TDATA_FILES): $(TDATA_MARKER)
 
-tdatamarker: $(TZDATA)
-	mkdir $(VANGUARD_DIR)
-	gunzip -d < $(TZDATA) | tar xf - --exclude=Makefile
+$(TDATA_MARKER): $(TZDATA)
+	mkdir -p $(VANGUARD_DIR)
+	gunzip -d < $(TZDATA) | ( cd $(OUTDIR) ; tar xf - --exclude=Makefile )
 	for tzfile in $(TDATA) ; do \
-		mv $$tzfile $(VANGUARD_DIR)/$$tzfile && \
-		awk -v DATAFORM=rearguard -f ziguard.awk $(VANGUARD_DIR)/$$tzfile > $$tzfile; \
+		mv $(OUTDIR)/$$tzfile $(VANGUARD_DIR)/$$tzfile && \
+		awk -v DATAFORM=rearguard -f $(OUTDIR)/ziguard.awk $(VANGUARD_DIR)/$$tzfile > $(OUTDIR)/$$tzfile; \
 	done
 	touch $@
 
-posix_only:	$(ZICEXEC) $(TDATA) $(srcdir)/icuzones
-		$(ZICEXEC) -d $(TZDIR) -L /dev/null $(TDATA) $(srcdir)/icuzones
+posix_only:	$(ZICEXEC) $(TDATA_FILES) $(srcdir)/icuzones
+		cd $(OUTDIR) && $(abspath $(ZICEXEC)) -d $(TZDIR) -L /dev/null $(TDATA) $(ICUZONES)
 
 
 icu_data:	$(TZ2ICUEXEC) posix_only
-		$(TZ2ICUEXEC) $(TZDIR) `echo $(TZDATA) | sed -e "s/.*\/tzdata//;s/\.tar\.gz$$//"`
-		$(TZ2ICUEXEC) $(TZDIR) `echo $(TZDATA) | sed -e "s/.*\/tzdata//;s/\.tar\.gz$$//"` --old
+		cd $(OUTDIR) && $(abspath $(TZ2ICUEXEC)) $(TZDIR) `echo $(TZDATA) | sed -e "s/.*\/tzdata//;s/\.tar\.gz$$//"`
+		cd $(OUTDIR) && $(abspath $(TZ2ICUEXEC)) $(TZDIR) `echo $(TZDATA) | sed -e "s/.*\/tzdata//;s/\.tar\.gz$$//"` --old
 
 clean:
-		-rm -f core *.o *.out zdump${EXEEXT} $(ZICTARG) date $(TZ2ICUTARG)
+		-rm -f core *.o *.out $(ZICTARG) $(TZ2ICUTARG) $(ICUZDUMPTARG)
 		@echo ICU specific cleanup:
-		-rm -f $(ICUDATA)
-		-rm -rf $(TZDIR)
-		-rm -rf $(VANGUARD_DIR)
-		-$(RMV) $(ICUZDUMPTARG) tzorig ./zdumpout/ ./icuzdumpout/
-ifneq ($(TZDATA),)
-		-rm -rf `gunzip -d < $(TZDATA) | tar tf - --exclude=Makefile | grep -o '[^ ]*$$' | tr '\n' ' '`
-		-rm -f tdatamarker
-endif
+		-$(RMV) $(OUTDIR)
 
 checkclean:
 
 dataclean: clean
-	-rm -f $(TDATA) $(XDATA)
 
 distclean:	dataclean clean
 	-rm -f Makefile
