@@ -634,15 +634,6 @@ _scxRange(const void *context, UChar32 start, UChar32 end, uint32_t value) {
 
 }
 
-// for icuexportdata
-U_CAPI void U_EXPORT2
-uprv_addScriptExtensionsCodePoints(const USetAdder *sa, UErrorCode *pErrorCode) {
-    if(U_FAILURE(*pErrorCode)) {
-        return;
-    }
-    utrie2_enum(&propsVectorsTrie, nullptr, _scxRange, sa);
-}
-
 U_CAPI UBlockCode U_EXPORT2
 ublock_getCode(UChar32 c) {
     // We store Block values indexed by the code point shifted right 4 bits

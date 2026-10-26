@@ -53,15 +53,6 @@ jobs:
         env:
           CC: clang
           CXX: clang++
-      - name: Build normalization data files
-        run: |
-          cd icu4c/source
-          mkdir -p icuexportdata/norm/fast
-          ./bin/icuexportdata --mode norm --index --copyright --verbose --destdir icuexportdata/norm/fast --trie-type fast
-          mkdir -p icuexportdata/norm/small
-          ./bin/icuexportdata --mode norm --index --copyright --verbose --destdir icuexportdata/norm/small --trie-type small
-        env:
-          LD_LIBRARY_PATH: lib
       - name: Build collation data files
         run: |
           cd icu4c/source
@@ -76,16 +67,10 @@ jobs:
           rm icuexportdata/collation/implicithan/*.res
         env:
           LD_LIBRARY_PATH: lib
-      - name: Build segmenter dictionary files
+      - name: Copy segmenter dictionary files
         run: |
           cd icu4c/source
-          mkdir -p icuexportdata/segmenter/dictionary
-          for FILE in $(ls data/brkitr/dictionaries | xargs -n 1 basename); do
-            ./bin/gendict --uchars --toml data/brkitr/dictionaries/$FILE icuexportdata/segmenter/dictionary/$(basename $FILE .txt).toml
-          done
           cp data/brkitr/dictionaries/*.txt icuexportdata/segmenter/dictionary
-        env:
-          LD_LIBRARY_PATH: lib
       - name: Zip
         run: |
           cd icu4c/source/icuexportdata

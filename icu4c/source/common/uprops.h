@@ -500,10 +500,6 @@ ublock_addPropertyStarts(const USetAdder *sa, UErrorCode &errorCode);
 uprv_getInclusions(const USetAdder *sa, UErrorCode *pErrorCode);
 */
 
-/** @internal for icuexportdata */
-U_CAPI void U_EXPORT2
-uprv_addScriptExtensionsCodePoints(const USetAdder *sa, UErrorCode *pErrorCode);
-
 // TODO: Move this into a different header file (udataswp.h? new unames.h?) so that uprops.h
 // need not be C-compatible any more.
 /**
